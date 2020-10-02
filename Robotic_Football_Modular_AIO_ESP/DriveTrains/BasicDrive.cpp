@@ -1,4 +1,5 @@
-#include <ESP32Servo.h>
+#include "../src/ESP32Servo/src/ESP32Servo.h"
+
 Servo leftMotor, rightMotor;        // Define motor objects
 static int drive = 0;               // Initial speed before turning calculations
 static int turn = 0;                // Turn is adjustment to drive for each motor separately to create turns
@@ -6,6 +7,7 @@ static int motorDirection = 1;
 static int xInput, yInput, throttleL, throttleR;
 #define LEFT_MOTOR            19     // left motor is wired to pin 9
 #define RIGHT_MOTOR           18   // right motor is wired to pin 10
+#define MAX_DRIVE             90    // limited because of issues with calibrating victors to full 0-180 range
 
 void driveSetup(int motorType) {
   /* These lines are attaching the motor objects to their output pins on the arduino
@@ -17,7 +19,6 @@ void driveSetup(int motorType) {
   leftMotor.write(90);
   rightMotor.write(90);
   motorDirection = motorType;
-#define MAX_DRIVE             90    // limited because of issues with calibrating victors to full 0-180 range
 }
 
 void driveCtrl(int handicap, int leftX, int leftY, int rightX, int rightY)
