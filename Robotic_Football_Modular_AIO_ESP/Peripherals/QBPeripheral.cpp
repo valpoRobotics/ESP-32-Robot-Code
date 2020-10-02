@@ -1,6 +1,5 @@
-#include <Servo.h>
-#include <PS3BT.h>
-#include <usbhub.h>
+#include "../src/ESP32Servo/src/ESP32Servo.h"
+#include "../src/esp32-ps3-develop/src/Ps3Controller.h"
 
 #define QB_THROWER            5
 #define TRIANGLE_THROW        175
@@ -17,12 +16,12 @@ void peripheralSetup(){
 	qbThrower.writeMicroseconds(1500);
 }
   
-void peripheral(PS3BT PS3){
-	if (PS3.getButtonPress(TRIANGLE))    qbThrower.write(TRIANGLE_THROW);
-	else if (PS3.getButtonPress(CIRCLE)) qbThrower.write(CIRCLE_THROW + throwOffset);
-	else if (PS3.getButtonPress(CROSS))  qbThrower.write(CROSS_THROW + throwOffset);
-	else if (PS3.getButtonPress(SQUARE)) qbThrower.write(SQUARE_THROW + throwOffset) ;
-	else if (PS3.getButtonPress(R1))
+void peripheral(Ps3Controller Ps3){
+	if (Ps3.data.button.triangle)    qbThrower.write(TRIANGLE_THROW);
+	else if (Ps3.data.button.circle) qbThrower.write(CIRCLE_THROW + throwOffset);
+	else if (Ps3.data.button.cross)  qbThrower.write(CROSS_THROW + throwOffset);
+	else if (Ps3.data.button.square) qbThrower.write(SQUARE_THROW + throwOffset) ;
+	else if (Ps3.data.button.r1)
 	{
 		qbThrower.write(RELOAD_THROW);
 		throwOffset = 0;

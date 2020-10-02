@@ -1,6 +1,5 @@
-#include <Servo.h>
-#include <PS3BT.h>
-#include <usbhub.h>
+#include "../src/ESP32Servo/src/ESP32Servo.h"
+#include "../src/esp32-ps3-develop/src/Ps3Controller.h"
 
 #define KICKER_MOTOR          5     	// Kicker motor is wired to pin 5
 										//these are the speeds for kicking and reload the kicker foot
@@ -13,10 +12,10 @@ void peripheralSetup(){
 	kicker.writeMicroseconds(1500);
 }
   
-void peripheral(PS3BT PS3){
-	if (PS3.getButtonPress(CROSS)){
+void peripheral(Ps3Controller Ps3){
+	if (Ps3.data.button.cross){
 		kicker.writeMicroseconds(KICKER_POWER);
-	}else if (PS3.getButtonPress(TRIANGLE)){
+	}else if (Ps3.data.button.triangle){
 		kicker.writeMicroseconds(KICKER_RELOAD);
 	}else{
 		kicker.writeMicroseconds(1500);

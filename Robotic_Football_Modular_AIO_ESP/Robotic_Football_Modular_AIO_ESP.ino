@@ -1,7 +1,6 @@
 #include "src/esp32-ps3-develop/src/Ps3Controller.h"
 #include "src/ESP32Servo/src/ESP32Servo.h"
 
-
 //===========Uncomment a LED===========================
 #include "Leds/Leds.cpp"
 //#include "Leds/OldLeds.cpp"
@@ -12,23 +11,48 @@
 //#include "DriveTrains/SquareOmniDrive.cpp"
 
 //===========Uncomment for tackle sensor===============
-//
 #define TACKLE
-//===========Uncomment to choose a Peripheral==========
-//#define PERIPHERAL
-//#include "Peripherals/WRPeripheral.cpp"
-//#include "Peripherals/CenterPeripheral.cpp"
-//#include "Peripherals/QBPeripheral.cpp"
-//#include "Peripherals/KickerPeripheral.cpp"
 
-//==========Uncomment if not using bag motors==========
+//===========Uncomment to choose a Position============
+//#define WR
+//#define Center
+//#define QB
+//#define Kicker
+
+//===========Uncomment if not using bag motors=========
 //#define OldMotors
+
+//===========Uncomment for debug modes=================
+//#define SHOW_CONTROLLER_INPUT
+//#define SHOW_EXECUTION_TIME
+
+//===================================
+//Includes the right peripheral file for specified position
+#ifdef WR
+    #define PERIPHERAL
+    #include "Peripherals/WRPeripheral.cpp"
+#endif
+
+#ifdef Center
+    #define PERIPHERAL
+    #include "Peripherals/CenterPeripheral.cpp"
+#endif
+
+#ifdef QB
+    #define PERIPHERAL
+    #include "Peripherals/QBPeripheral.cpp"
+#endif
+
+#ifdef Kicker
+    #define PERIPHERAL
+    #include "Peripherals/KickerPeripheral.cpp"
+#endif
 
 //This just enables and disables the old motors
 #ifdef OldMotors
-int motorType = -1;
+  int motorType = -1;
 #else
-int motorType = 1;
+  int motorType = 1;
 #endif
 //===================================
 
@@ -40,68 +64,93 @@ bool kidsMode = false;
 int newconnect = 0;
 int leftX, leftY, rightX, rightY;
 ps3_cmd_t cmd;
+float exeTime;
 
 void setup() {// This is stuff for connecting the PS3 controller.
-  Ps3.begin("00:1b:dc:0f:f3:59");
-  driveSetup(motorType);//Setup the drive train
+  Serial.begin(115200);       //Begin Serial Communications
   ledsSetup();          //Setup the leds
-  flashLeds();          //flash the leds
+  flashLeds();
+  
+  // Wait for contoller to be connected to the esp
+  Ps3.begin("00:1b:dc:0f:f3:59");
+  while(!Ps3.isConnected()){
+    Serial.println("Controller not connected");
+    blue();
+  }
+  Serial.println("Controller is connected!");
 
+  // Vibrates controller when you first connect
+  if (newconnect == 0) {
+    cmd.rumble_left_intensity = 0xff;
+    cmd.rumble_right_intensity = 0xff;
+    cmd.rumble_right_duration = 750;
+    cmd.rumble_left_duration = 750;
+    newconnect++;
+    ps3Cmd(cmd);
+  }
 
-#ifdef PERIPHERAL
-  peripheralSetup();//Call the peripheral setup
-#endif
+  //Setup the drive train, peripherals, tackle sensor, and changes leds to green once complete
+  driveSetup(motorType);
 
-  int newconnect = 0;         // Variable(boolean) for connection to ps3, also activates rumble
+  #ifdef PERIPHERAL
+    peripheralSetup();
+  #endif
 
-#ifdef TACKLE
-  pinMode(TACKLE_INPUT, INPUT); // define the tackle sensor pin as an input
-#endif
-  Serial.begin(9600);       //Begin Serial Communications
-  /*
-    if (Usb.Init() == -1)       // this is for an error message with USB connections
-    {
-    Serial.print(F("\r\nOSC did not start"));
-    while (1);
-    }
-    Serial.print(F("\r\nPS3 Bluetooth Library Started"));
-  */
+  #ifdef TACKLE
+    pinMode(TACKLE_INPUT, INPUT);
+  #endif
+
+  #ifdef TACKLE
+      green();
+  #else
+      blue();
+  #endif
+
+  // Variable(boolean) for connection to ps3, also activates rumble
+  int newconnect = 0;         
 }
 
 
 void loop() {
+  // Run if the controller is connected
+  if (Ps3.isConnected()) {
+    #ifdef SHOW_EXECUTION_TIME
+      exeTime = micros();
+    #endif
 
-  //  Usb.Task();                           // This updates the input from the PS3 controller
-  if (Ps3.isConnected())                 // run if the controller is connected
-  {
-    if (newconnect == 0)                // this is the vibration that you feel when you first connect
-    {
-#ifdef TACKLE
-      green();
-#else
-      blue();
-#endif
-      cmd.rumble_left_intensity = 0xff;
-      cmd.rumble_right_intensity = 0xff;
-      cmd.rumble_right_duration = 750;
-      cmd.rumble_left_duration = 750;
-      newconnect++;
-      ps3Cmd(cmd);
-    }
-    if (Ps3.data.button.ps && newconnect == 1) {
-      newconnect = 0;
+    // !QUESTION! - What is the point of this code?
+    // // Press the PS button to disconnect the controller
+    // if (Ps3.data.button.ps && newconnect == 1) {
+    //   newconnect = 0;
+    // }
 
-    }
-    //========================================Get Controller Input==========================================
-    leftX = map(Ps3.data.analog.stick.lx, -128, 127, -90, 90);    // Recieves PS3
-    leftY = map(Ps3.data.analog.stick.ly, -128, 127, -90, 90);    // Recieves PS3
-    rightX = map(Ps3.data.analog.stick.rx, -128, 127, -90, 90);   // Recieves PS3
-    rightY = map(Ps3.data.analog.stick.ry, -128, 127, -90, 90);   // Recieves PS3
-    if (abs(leftX) < 8) leftX = 0;                             // deals with the stickiness
+    //====================Get Controller Input=================================
+    // Reads and maps joystick values from -90 to 90
+    leftX = map(Ps3.data.analog.stick.lx, -128, 127, -90, 90);
+    leftY = map(Ps3.data.analog.stick.ly, -128, 127, -90, 90);
+    rightX = map(Ps3.data.analog.stick.rx, -128, 127, -90, 90);
+    rightY = map(Ps3.data.analog.stick.ry, -128, 127, -90, 90);
+    
+    // Deals with stickness from joysticks
+    if (abs(leftX) < 8) leftX = 0;
     if (abs(leftY) < 8) leftY = 0;
     if (abs(rightX) < 8) rightX = 0;
+    if (abs(rightY) < 8) rightY = 0;
+    
+    #ifdef SHOW_CONTROLLER_INPUT
+      Serial.print(leftX);    
+      Serial.print("\t");
+      Serial.print(leftY);    
+      Serial.print("\t");
+      Serial.print(rightX);    
+      Serial.print("\t");
+      Serial.print(rightY);    
+      Serial.print("\t");
+    #endif
 
-    if (Ps3.data.button.start) { //Toggle in and out of kidsmode
+    //====================Specify the handicap=================================
+    //Toggle in and out of kidsmode
+    if (Ps3.data.button.start) {
       if (kidsMode == true) {
         kidsMode = false;
         handicap = 3;
@@ -114,61 +163,87 @@ void loop() {
         //PS3.setRumbleOn(5, 255, 5, 255);// vibrate both, then left, then right
       }
     }
+
     if (kidsMode == false) {
-      if (Ps3.data.button.r2) { //Boost
+      // Press R2 to boost
+      if (Ps3.data.button.r2) {
         handicap = 1;
       }
-      else if (Ps3.data.button.l2) { //Slow Down
+      // Press L2 to slow down
+      else if (Ps3.data.button.l2) {
         handicap = 6;
-      } else {
+      } 
+      // Sets default handicap
+      else {
         handicap = 3;
       }
     }
-    //==========================================================================
 
-    //=================================Tackle Sensor================================
-#ifdef TACKLE
-    // NORMAL OPERATION MODE
-    // for the if statement for whether or not
-    // tackle is enabled. cool stuff
-    if (Ps3.data.button.left) {
-      if (stayTackled == true) {
-        stayTackled = false;
-      } else {
-        stayTackled = true;
-      }
-      /*
-        Ps3.data.cmd.rumble_right_duration(30);
-        Ps3.data.cmd.rumble_right_intensity(255);
-        Ps3.data.cmd.rumble_left_duration(30);
-        Ps3.data.cmd.rumble_left_intensity(255);
-      */
-      //PS3.setRumbleOn(30, 255, 30, 255);
+    //===============================Adjust motors=============================
+    if (Ps3.data.button.left){
+      correctMotor(1);
+      Serial.println("Left button clicked");
     }
-    if (!digitalRead(TACKLE_INPUT))
-    {
-      red();
-      if (!hasIndicated) {
-        //PS3.setRumbleOn(10, 255, 10, 255);
-        hasIndicated = true;
-      }
+    if (Ps3.data.button.right){
+      correctMotor(-1);
+      Serial.println("right button clicked");
     }
-    else
-    {
-      if (stayTackled == false) {
-        hasIndicated = false;
-        green();
+
+    //=================================Tackle Sensor===========================
+    #ifdef TACKLE
+      // NORMAL OPERATION MODE
+      // for the if statement for whether or not
+      // tackle is enabled. cool stuff
+      if (Ps3.data.button.left) {
+        if (stayTackled == true) {
+          stayTackled = false;
+        } 
+        else {
+          stayTackled = true;
+        }
+        /*
+          Ps3.data.cmd.rumble_right_duration(30);
+          Ps3.data.cmd.rumble_right_intensity(255);
+          Ps3.data.cmd.rumble_left_duration(30);
+          Ps3.data.cmd.rumble_left_intensity(255);
+        */
+        //PS3.setRumbleOn(30, 255, 30, 255);
       }
-    }
-#endif
+      if (!digitalRead(TACKLE_INPUT))
+      {
+        red();
+        if (!hasIndicated) {
+          //PS3.setRumbleOn(10, 255, 10, 255);
+          hasIndicated = true;
+        }
+      }
+      else
+      {
+        if (stayTackled == false) {
+          hasIndicated = false;
+          green();
+        }
+      }
+    #endif
     //===============================================================================================
 
-    driveCtrl(handicap, leftX, leftY, rightX, rightY);//Drive the drive train
+    // Drives the robot according to joystick input
+    driveCtrl(handicap, leftX, leftY, rightX, rightY);
 
-#ifdef PERIPHERAL
-    peripheral(Ps3);//Call the peripheral
-#endif
+    #ifdef PERIPHERAL
+        peripheral(Ps3);//Call the peripheral
+    #endif
+
+    #ifdef SHOW_EXECUTION_TIME
+      Serial.print("Exe exeTime: ");
+      Serial.print(micros() - exeTime);
+      Serial.print("\t");
+    #endif
+
+    Serial.println();
   }
+
+  // If the controller is not connected, LEDs blue and stop robot
   if (!Ps3.isConnected()) {
     blue();
     driveStop();
